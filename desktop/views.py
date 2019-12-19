@@ -1,14 +1,16 @@
+from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import LoginView, LogoutView
 from django.contrib.messages.views import SuccessMessageMixin
+from django.contrib import messages
 from django.core.signing import BadSignature
 from django.shortcuts import render, get_object_or_404
 
 
 # Create your views here.
 from django.urls import reverse_lazy
-from django.views.generic import UpdateView, CreateView, TemplateView
+from django.views.generic import UpdateView, CreateView, TemplateView, DeleteView
 
 from .utilities import signer
 from .forms import ChangeUserInfoForm, RegisterUserForm
@@ -22,9 +24,11 @@ def index(request):
 class BBLoginView(LoginView):
     template_name = 'desktop/login.html'
 
+
 @login_required
 def profile(request):
     return render(request, 'desktop/profile.html')
+
 
 class DTLogoutView(LoginRequiredMixin, LogoutView):
     template_name = 'desktop/logout.html'
@@ -53,6 +57,7 @@ class RegisterUserView(CreateView):
     form_class = RegisterUserForm
     success_url = reverse_lazy('desktop:register_done')
 
+
 class RegisterDoneView(TemplateView):
     template_name = 'desktop/register_done.html'
 
@@ -71,3 +76,24 @@ def user_activate(request, sign):
         user.is_activated = True
         user.save()
     return render(request, template)
+
+
+class DeleteUserView(LoginRequiredMixin, DeleteView):
+    model = AdvUser
+    template_name = 'desktop/delete_user.html'
+    success_url = reverse_lazy('desktop:index')
+
+    def dispatch(self, request, *args, **kwargs):
+        self.user_id = request.user.pk
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        logout(request)
+        messages.add_message(request, messages.SUCCESS,
+                             'Пользователь удалён')
+        return super().post(request, *args, **kwargs)
+
+    def get_object(self, queryset=None):
+        if not queryset:
+            queryset = self.get_queryset()
+        return get_object_or_404(queryset, pk=self.user_id)
